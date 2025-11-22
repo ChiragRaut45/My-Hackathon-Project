@@ -627,5 +627,21 @@
     "raw_input_hash": "6c760b377115ce318e7e60c36cf9c1ce16ddb07a06e304a98a8ac13d796c9692",
     "previous_hash": "6f44ee5d8d151eefdef210be575fd80058cafbc93e15dc4796b98e6927dd7f5e",
     "hash": "19367ad1f3aa6281c2f2ce449f502be11aa81429fac6781b15c24edcb6968bfb"
+  },
+  {
+    "index": 39,
+    "timestamp": 1763832214.656796,
+    "patient_id": "P1003",
+    "prediction": "Diabetes",
+    "probabilities": [
+      0.9999755620956421,
+      3.3648564112809254e-07,
+      9.505316484137438e-06,
+      3.973405455326429e-06,
+      1.0651461707311682e-05
+    ],
+    "raw_input_hash": "875514f3c0eb1fc5e2ec35ce4cc2d36a381d9dae0c55e414b462cc35602d425a",
+    "previous_hash": "19367ad1f3aa6281c2f2ce449f502be11aa81429fac6781b15c24edcb6968bfb",
+    "hash": "2c83d3383035b3440a7db37ffab0259e0b2a3f8ee316aebd39104965d904e445"
   }
 ]
