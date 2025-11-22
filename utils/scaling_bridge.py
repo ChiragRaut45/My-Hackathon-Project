@@ -1,61 +1,79 @@
 # utils/scaling_bridge.py
 """
-Scaling bridge: Convert raw clinical values -> scaled (0–1).
-Adds advanced data-quality detection (critical alerts).
+Scaling bridge: Convert raw clinical values -> scaled (0–1)
+Includes:
+ - Min–max scaling
+ - Out-of-range CRITICAL alerts
+ - Data quality warnings
 """
 
 import json
-from typing import Dict, Tuple
 
-MEDICAL_RANGES_PATH = "utils/medical_ranges.json"
+RANGE_PATH = "utils/medical_ranges.json"
 
-def load_medical_ranges(path: str = MEDICAL_RANGES_PATH):
+
+def load_ranges(path=RANGE_PATH):
     with open(path, "r") as f:
         return json.load(f)
 
-def scale_value(raw, mn, mx):
-    if raw < mn:
-        raw = raw  # still show true value for alert
-    if raw > mx:
-        raw = raw
-    # scaled after clipping:
-    raw_clipped = max(mn, min(raw, mx))
-    return (raw_clipped - mn) / (mx - mn)
 
-def scale_input(raw_inputs: Dict[str, str], ranges=None):
+def scale_value(raw, mn, mx):
+    """
+    Min–max scaling with clipping.
+    """
+    if raw < mn:
+        raw = mn   # clip but allow alert
+    if raw > mx:
+        raw = mx
+    return (raw - mn) / (mx - mn)
+
+
+def scale_input(raw_inputs, ranges=None):
+    """
+    Convert raw patient inputs → scaled 0–1 + warnings + critical alerts.
+    RETURNS → (scaled_dict, warnings_list, alerts_list)
+    """
     if ranges is None:
-        ranges = load_medical_ranges()
+        ranges = load_ranges()
 
     scaled = {}
     warnings = []
-    alerts = []   # 🚨 critical out-of-range alerts
+    alerts = []
 
     for feat, val in raw_inputs.items():
 
         if feat not in ranges:
-            warnings.append(f"{feat}: No medical range defined")
+            warnings.append(f"No medical range found for {feat}")
             scaled[feat] = 0.5
             continue
 
         mn, mx = ranges[feat]
 
-        if val is None or val == "":
-            warnings.append(f"{feat}: Missing → using neutral 0.5")
+        # Missing
+        if val == "" or val is None:
             scaled[feat] = 0.5
+            warnings.append(f"{feat}: Missing → Default = 0.5")
             continue
 
+        # Invalid number
         try:
             rv = float(val)
         except:
-            warnings.append(f"{feat}: Invalid number → using 0.5")
             scaled[feat] = 0.5
+            warnings.append(f"{feat}: Invalid entry → Using 0.5")
             continue
 
-        # --- critical alert detection ---
+        # -----------------------
+        # 🚨 CRITICAL ALERT LOGIC
+        # -----------------------
         if rv < mn:
-            alerts.append(f"⚠️ {feat} critically LOW ({rv}) — expected {mn} to {mx}")
+            alerts.append(
+                f"⚠️ {feat} critically LOW ({rv}) — below physiological limits ({mn}-{mx})"
+            )
         if rv > mx:
-            alerts.append(f"⚠️ {feat} dangerously HIGH ({rv}) — expected {mn} to {mx}")
+            alerts.append(
+                f"⚠️ {feat} dangerously HIGH ({rv}) — above physiological limits ({mn}-{mx})"
+            )
 
         # scale to 0–1
         scaled_val = scale_value(rv, mn, mx)
