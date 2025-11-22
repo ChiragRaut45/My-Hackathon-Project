@@ -1,0 +1,98 @@
+{
+  "Glucose": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "Cholesterol": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "Hemoglobin": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "Platelets": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "White Blood Cells": {
+    "min": -0.00020615,
+    "max": 1.0
+  },
+  "Red Blood Cells": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "Hematocrit": {
+    "min": 0.0,
+    "max": 1.000856814
+  },
+  "Mean Corpuscular Volume": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "Mean Corpuscular Hemoglobin": {
+    "min": -0.000614331,
+    "max": 1.0
+  },
+  "Mean Corpuscular Hemoglobin Concentration": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "Insulin": {
+    "min": -0.000779055,
+    "max": 1.0
+  },
+  "BMI": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "Systolic Blood Pressure": {
+    "min": -0.000197123,
+    "max": 1.000107347
+  },
+  "Diastolic Blood Pressure": {
+    "min": -0.00035986,
+    "max": 1.0
+  },
+  "Triglycerides": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "HbA1c": {
+    "min": -0.000990875,
+    "max": 1.0
+  },
+  "LDL Cholesterol": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "HDL Cholesterol": {
+    "min": -0.000546137,
+    "max": 1.000743542
+  },
+  "ALT": {
+    "min": -0.000311872,
+    "max": 1.000325922
+  },
+  "AST": {
+    "min": 0.0,
+    "max": 1.000402418
+  },
+  "Heart Rate": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "Creatinine": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "Troponin": {
+    "min": 0.0,
+    "max": 1.000125171
+  },
+  "C-reactive Protein": {
+    "min": -0.00099109,
+    "max": 1.0
+  }
+}
