@@ -8,3 +8,7 @@ plotly
 reportlab
 shap
 matplotlib
+ipython
+shap
+jupyter
+seaborn
