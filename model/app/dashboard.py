@@ -403,7 +403,7 @@ if predict_btn:
         """, unsafe_allow_html=True)
 
     display_metric(pred_card, "Prediction", f"{pred_label}", "#0b5cff")
-    display_metric(conf_card, "Confidence", f"{confidence*100:.1f}%", "#198754")
+    display_metric(conf_card, "Accuracy", f"{confidence*100:.1f}%", "#198754")
     display_metric(issues_card, "Input issues", str(len(issues_list)), "#dc3545" if issues_list else "#6c757d")
 
     # ------------ Banner ------------
@@ -423,7 +423,7 @@ if predict_btn:
                 <h3 style='color:{banner_color}; margin:0px 0px 6px 0px;'>
                     Prediction: <b>{pred_label}</b>
                 </h3>
-                <div class='small'>Confidence: <b>{confidence*100:.1f}%</b></div>
+                <div class='small'>Accuracy: <b>{confidence*100:.1f}%</b></div>
                 <div class='small' style='margin-top:8px;'>
                     Predicted at: {datetime.utcnow().isoformat(timespec='seconds')} UTC
                 </div>
