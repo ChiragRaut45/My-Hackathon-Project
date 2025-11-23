@@ -452,90 +452,53 @@ if predict_btn:
         else:
             st.success("No data-quality issues detected.")
         st.markdown("</div>", unsafe_allow_html=True)
-
-    # ------------ TOP CONTRIBUTING FEATURES (SHAP preferred) ------------
+        
+    # ------------ DYNAMIC BAR PLOT (BASED ON USER INPUTS) ------------
     with contrib_box:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.subheader("Top contributing features (patient-specific)")
+        st.subheader("Top Contributing Features (Based on Your Inputs)")
 
-        # Try SHAP first (patient-specific local explanation)
-        try:
-            import shap
-            shap.initjs()
+        # convert scaled input dict to DataFrame
+        user_df = pd.DataFrame(list(scaled.items()), columns=["feature", "value"])
 
-            # Explainer depends on model type. For XGBoost use TreeExplainer.
-            try:
-                explainer = shap.TreeExplainer(model)
-                shap_values = explainer.shap_values(X)  # shape depends on model; hope it's (n_classes, n_features) or (n_samples, n_features)
-            except Exception:
-                # Fallback: try KernelExplainer (slower)
-                explainer = shap.KernelExplainer(lambda d: model.predict_proba(d), X)
-                shap_values = explainer.shap_values(X, nsamples=100)
+        # keep only positive values
+        user_df = user_df[user_df["value"] > 0]
 
-            # shap_values can be nested (per-class) for multiclass - handle common shapes
-            # Normalize to a single 1D array of importances (absolute)
-            if isinstance(shap_values, list) or (isinstance(shap_values, np.ndarray) and shap_values.ndim == 3):
-                # multiclass -> take sum of absolute values across classes for the single sample
-                # if list, convert to array
-                if isinstance(shap_values, list):
-                    arr = np.array([np.abs(s[0]) for s in shap_values])  # shape: (n_classes, n_features)
-                else:
-                    arr = np.abs(shap_values[:, 0, :])  # shape: (n_classes, n_features)
-                abs_vals = np.sum(arr, axis=0)  # aggregate across classes -> (n_features,)
-            else:
-                # shap_values shape (n_samples, n_features) or (n_features,)
-                arr = np.abs(np.array(shap_values))
-                if arr.ndim == 1:
-                    abs_vals = arr
-                else:
-                    abs_vals = arr[0]
+        # select top 10 features with strongest values
+        user_df = user_df.sort_values("value", ascending=False).head(10)
 
-            # choose top 10 features by absolute SHAP value
-            top_idx = np.argsort(abs_vals)[::-1][:10]
-            top_features_shap = [(X.columns[i], float(abs_vals[i])) for i in top_idx]
+        if not user_df.empty:
+            import plotly.express as px
 
-            # prepare dataframe for plotting
-            top_df = pd.DataFrame(top_features_shap, columns=["feature", "importance"])
-            top_df = top_df[top_df["importance"] > 0]
+            fig = px.bar(
+                user_df,
+                x="value",
+                y="feature",
+                orientation="h",
+                text="value",
+                color="value",
+                color_continuous_scale="Blues"
+            )
 
-            if not top_df.empty:
-                import plotly.express as px
-                fig = px.pie(
-                    top_df,
-                    names="feature",
-                    values="importance",
-                    hole=0.55
-                )
-                fig.update_layout(paper_bgcolor="#ffffff", plot_bgcolor="#ffffff", margin=dict(l=10, r=10, t=20, b=20), height=350)
-                fig.update_traces(textfont_color="#1b2a49", textposition="inside")
-                st.plotly_chart(fig, use_container_width=True)
-                st.table(top_df.style.format({"importance": "{:.4f}"}))
-            else:
-                st.write("SHAP produced no significant feature attributions.")
+            fig.update_layout(
+                height=400,
+                xaxis_title="Scaled Value (0–1)",
+                yaxis_title="Feature",
+                paper_bgcolor="#ffffff",
+                plot_bgcolor="#ffffff",
+                margin=dict(l=20, r=20, t=30, b=20)
+            )
 
-        except Exception as e_shap:
-            # SHAP unavailable or failed — fallback to model.feature_importances_
-            st.write("SHAP analysis unavailable or failed. Falling back to global feature importance.")
-            try:
-                if top_features and len(top_features) > 0:
-                    top_df = pd.DataFrame(top_features, columns=["feature", "global_importance"])
-                    import plotly.express as px
-                    fig = px.pie(
-                        top_df,
-                        names="feature",
-                        values="global_importance",
-                        hole=0.55
-                    )
-                    fig.update_layout(paper_bgcolor="#ffffff", plot_bgcolor="#ffffff", margin=dict(l=10, r=10, t=20, b=20), height=350)
-                    fig.update_traces(textfont_color="#1b2a49", textposition="inside")
-                    st.plotly_chart(fig, use_container_width=True)
-                    st.table(top_df.style.format({"global_importance": "{:.4f}"}))
-                else:
-                    st.write("No feature importance available for this model.")
-            except Exception as e_fb:
-                st.write("Fallback global importance failed:", str(e_fb))
-            # Optionally show the SHAP error in a little note for debugging
-            st.info(f"SHAP error: {str(e_shap)}")
+            fig.update_traces(
+                texttemplate="%{text:.3f}",
+                textposition="outside"
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+            st.table(user_df.style.format({"value": "{:.4f}"}))
+
+        else:
+            st.info("Not enough data to generate a bar chart.")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
