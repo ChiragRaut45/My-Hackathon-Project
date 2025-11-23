@@ -283,7 +283,7 @@ col_left, col_right = st.columns([1.0, 1.1], gap="large")
 with col_left:
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("Patient Information")
-    patient_id = st.text_input("Patient ID (anonymized)", value=st.session_state.get("patient_id", "patient_001"))
+    patient_id = st.text_input("Patient ID", value=st.session_state.get("patient_id", "patient_001"))
     st.session_state["patient_id"] = patient_id
 
     st.markdown("**Enter raw lab values (real units)**")
@@ -447,7 +447,7 @@ if predict_btn:
     with warns_box:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         if issues_list:
-            st.subheader("Input warnings / alerts")
+            st.subheader(" Alerts")
             st.table(pd.DataFrame(issues_list))
         else:
             st.success("No data-quality issues detected.")
