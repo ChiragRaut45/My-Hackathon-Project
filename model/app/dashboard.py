@@ -1,6 +1,9 @@
 # model/app/dashboard.py
 """
 Premium MediGuard AI — Clinician Dashboard (FULL VERSION with auto-PDF)
+
+Option A: The "Top contributing features" card now shows a patient-specific SHAP pie chart
+after Predict. If SHAP is not installed or fails, it falls back to model.feature_importances_.
 """
 
 import sys, os, json, hashlib
@@ -83,26 +86,28 @@ h1, h2, h3, h4 {
     border-radius: 8px;
 }
 
+.metric-card {
+    margin-right: 10px;
+}
+
+.pred-banner {
+    background: linear-gradient(135deg, #e0f0ff, #ffffff);
+    border-left: 6px solid #0b5cff;
+    padding: 12px;
+    border-radius: 8px;
+}
 </style>
 """, unsafe_allow_html=True)
-st.set_page_config(page_title="MediGuard AI — Clinician Dashboard", layout="wide")
 
-st.markdown("""
-<style>
-    ... YOUR CSS ...
-</style>
-""", unsafe_allow_html=True)
-
-# ⭐⭐⭐ INSERT HEADER HERE ⭐⭐⭐
-# ---------- HEADER SPACING + STYLING ----------
+# ---------- HEADER ----------
 st.markdown(
     """
     <style>
         .header-space {
-            padding-top: 5px;      /* distance from top */
-            padding-bottom: 10px;   /* space below header */
-            background: #f3f8ff;    /* soft medical blue */
-            text-align: left;       /* align like old UI */
+            padding-top: 5px;
+            padding-bottom: 10px;
+            background: #f3f8ff;
+            text-align: left;
             margin-bottom: 10px;
         }
         .big-header {
@@ -126,9 +131,6 @@ st.markdown("<div class='big-header'>MediGuard AI — Clinician Triage Dashboard
 st.markdown("<div class='muted-text'>Enter raw lab values (real units) and press <b>Predict</b>. This demo logs predictions to a local blockchain for audit.</div>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-
-
-
 # ---------- LOAD MODEL ----------
 @st.cache_resource
 def load_model(path=MODEL_PATH):
@@ -141,54 +143,62 @@ def load_label_encoder(path=LABEL_ENCODER_PATH):
     except:
         return None
 
-
 # ---------- PREDICTOR WRAPPER ----------
 def predict_with_model(model, X_df, label_encoder=None):
     """
-    Returns:
-    {
-      "prediction": str,
-      "probabilities": {label: prob},
-      "issues": [],
-      "top_contributing_features": [(feat, importance), ...]
-    }
+    Always returns a dictionary, never None.
     """
-    out = {"prediction": None, "probabilities": {}, "issues": [], "top_contributing_features": []}
 
-    # --- MODEL PRED ---
+    # default safe structure
+    out = {
+        "prediction": "N/A",
+        "probabilities": {},
+        "issues": [],
+        "top_contributing_features": []
+    }
+
     try:
-        proba = model.predict_proba(X_df)[0].tolist()
-        pred_idx = int(model.predict(X_df)[0])
-    except:
-        proba = []
-        pred_idx = int(model.predict(X_df)[0])
-
-    # --- LABELS ---
-    if label_encoder:
+        # ------- model predict -------
         try:
-            class_names = list(label_encoder.classes_)
-            pred_label = label_encoder.inverse_transform([pred_idx])[0]
-        except:
+            proba = model.predict_proba(X_df)[0].tolist()
+            pred_idx = int(model.predict(X_df)[0])
+        except Exception:
+            proba = []
+            pred_idx = int(model.predict(X_df)[0])
+
+        # ------- label decoding -------
+        if label_encoder:
+            try:
+                class_names = list(label_encoder.classes_)
+                pred_label = label_encoder.inverse_transform([pred_idx])[0]
+            except:
+                class_names = [str(i) for i in range(len(proba))]
+                pred_label = str(pred_idx)
+        else:
             class_names = [str(i) for i in range(len(proba))]
             pred_label = str(pred_idx)
-    else:
-        class_names = [str(i) for i in range(len(proba))]
-        pred_label = str(pred_idx)
 
-    # probabilities dict
-    if proba and len(proba) == len(class_names):
-        out["probabilities"] = {class_names[i]: float(proba[i]) for i in range(len(proba))}
+        # ------- build probability dictionary -------
+        if proba and len(proba) == len(class_names):
+            out["probabilities"] = {
+                class_names[i]: float(proba[i]) for i in range(len(proba))
+            }
 
-    out["prediction"] = pred_label
+        out["prediction"] = pred_label
 
-    # feature importance
-    if hasattr(model, "feature_importances_"):
-        feat = list(X_df.columns)
-        imp = model.feature_importances_
-        pairs = sorted(zip(feat, imp), key=lambda x: x[1], reverse=True)[:10]
-        out["top_contributing_features"] = [(f, float(v)) for f, v in pairs]
+        # ------- feature importance (global) -------
+        if hasattr(model, "feature_importances_"):
+            feats = list(X_df.columns)
+            imps = model.feature_importances_
+            pairs = sorted(zip(feats, imps), key=lambda x: x[1], reverse=True)[:10]
+            out["top_contributing_features"] = [(f, float(v)) for f, v in pairs]
 
-    return out
+        return out
+
+    except Exception as e:
+        print("predict_with_model ERROR:", e)
+        return out   # return safe dictionary instead of None
+
 # ---------- PART 2: medical ranges, defaults, presets, input UI ----------
 
 # ---------- load medical ranges to get feature order ----------
@@ -267,7 +277,6 @@ with st.sidebar:
     st.markdown("---")
     st.caption("Tip: use presets, then tweak numeric fields before Predict")
 
-
 # ---------- layout: left inputs, right outputs ----------
 col_left, col_right = st.columns([1.0, 1.1], gap="large")
 
@@ -312,8 +321,8 @@ with col_left:
 
     st.write("")
     predict_btn = st.button("🔮 Predict", type="primary")
-# ---------- PART 3: Prediction handling, output UI, PDF report, feature charts ----------
 
+# ---------- PART 3: Prediction handling, output UI, PDF report, SHAP chart ----------
 # Load cached model + encoder
 try:
     model = load_model()
@@ -336,8 +345,7 @@ with col_right:
     probs_box = st.container()
     warns_box = st.container()
     contrib_box = st.container()
-    pdf_box = st.container()   # NEW — PDF report box
-
+    pdf_box = st.container()   # PDF report box
 
 # ----------------- RUN PREDICTION --------------------
 if predict_btn:
@@ -373,10 +381,10 @@ if predict_btn:
 
     pred_label = out.get("prediction", "N/A")
     probs = out.get("probabilities", {})
+    # top_features still available (global) but we show SHAP first
     top_features = out.get("top_contributing_features", [])
 
     confidence = max(probs.values()) if probs else 0.0
-
 
     # ------------ Metric Cards ------------
     def display_metric(container, label, value, color="#0b5cff"):
@@ -445,33 +453,94 @@ if predict_btn:
             st.success("No data-quality issues detected.")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # ------------ Feature Importance Chart ------------
+    # ------------ TOP CONTRIBUTING FEATURES (SHAP preferred) ------------
     with contrib_box:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.subheader("Top contributing features")
+        st.subheader("Top contributing features (patient-specific)")
 
-        if top_features:
-            top_df = pd.DataFrame(top_features, columns=["feature", "global_importance"])
-            import plotly.express as px
-            
-            fig = px.pie(
-                top_df,
-                names="feature",
-                values="global_importance",
-                hole=0.55,
-                color_discrete_sequence=px.colors.sequential.Blues_r
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            st.table(top_df.style.format({"global_importance": "{:.4f}"}))
-        else:
-            st.write("Model does not expose feature importance.")
+        # Try SHAP first (patient-specific local explanation)
+        try:
+            import shap
+            shap.initjs()
+
+            # Explainer depends on model type. For XGBoost use TreeExplainer.
+            try:
+                explainer = shap.TreeExplainer(model)
+                shap_values = explainer.shap_values(X)  # shape depends on model; hope it's (n_classes, n_features) or (n_samples, n_features)
+            except Exception:
+                # Fallback: try KernelExplainer (slower)
+                explainer = shap.KernelExplainer(lambda d: model.predict_proba(d), X)
+                shap_values = explainer.shap_values(X, nsamples=100)
+
+            # shap_values can be nested (per-class) for multiclass - handle common shapes
+            # Normalize to a single 1D array of importances (absolute)
+            if isinstance(shap_values, list) or (isinstance(shap_values, np.ndarray) and shap_values.ndim == 3):
+                # multiclass -> take sum of absolute values across classes for the single sample
+                # if list, convert to array
+                if isinstance(shap_values, list):
+                    arr = np.array([np.abs(s[0]) for s in shap_values])  # shape: (n_classes, n_features)
+                else:
+                    arr = np.abs(shap_values[:, 0, :])  # shape: (n_classes, n_features)
+                abs_vals = np.sum(arr, axis=0)  # aggregate across classes -> (n_features,)
+            else:
+                # shap_values shape (n_samples, n_features) or (n_features,)
+                arr = np.abs(np.array(shap_values))
+                if arr.ndim == 1:
+                    abs_vals = arr
+                else:
+                    abs_vals = arr[0]
+
+            # choose top 10 features by absolute SHAP value
+            top_idx = np.argsort(abs_vals)[::-1][:10]
+            top_features_shap = [(X.columns[i], float(abs_vals[i])) for i in top_idx]
+
+            # prepare dataframe for plotting
+            top_df = pd.DataFrame(top_features_shap, columns=["feature", "importance"])
+            top_df = top_df[top_df["importance"] > 0]
+
+            if not top_df.empty:
+                import plotly.express as px
+                fig = px.pie(
+                    top_df,
+                    names="feature",
+                    values="importance",
+                    hole=0.55
+                )
+                fig.update_layout(paper_bgcolor="#ffffff", plot_bgcolor="#ffffff", margin=dict(l=10, r=10, t=20, b=20), height=350)
+                fig.update_traces(textfont_color="#1b2a49", textposition="inside")
+                st.plotly_chart(fig, use_container_width=True)
+                st.table(top_df.style.format({"importance": "{:.4f}"}))
+            else:
+                st.write("SHAP produced no significant feature attributions.")
+
+        except Exception as e_shap:
+            # SHAP unavailable or failed — fallback to model.feature_importances_
+            st.write("SHAP analysis unavailable or failed. Falling back to global feature importance.")
+            try:
+                if top_features and len(top_features) > 0:
+                    top_df = pd.DataFrame(top_features, columns=["feature", "global_importance"])
+                    import plotly.express as px
+                    fig = px.pie(
+                        top_df,
+                        names="feature",
+                        values="global_importance",
+                        hole=0.55
+                    )
+                    fig.update_layout(paper_bgcolor="#ffffff", plot_bgcolor="#ffffff", margin=dict(l=10, r=10, t=20, b=20), height=350)
+                    fig.update_traces(textfont_color="#1b2a49", textposition="inside")
+                    st.plotly_chart(fig, use_container_width=True)
+                    st.table(top_df.style.format({"global_importance": "{:.4f}"}))
+                else:
+                    st.write("No feature importance available for this model.")
+            except Exception as e_fb:
+                st.write("Fallback global importance failed:", str(e_fb))
+            # Optionally show the SHAP error in a little note for debugging
+            st.info(f"SHAP error: {str(e_shap)}")
+
         st.markdown("</div>", unsafe_allow_html=True)
 
     # ------------ PDF Report (AUTO-GENERATED) ------------
     with pdf_box:
-        from utils.pdf_report import generate_pdf_report
-        import tempfile
-
         pdf_filename = f"{patient_id}_report.pdf"
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -494,8 +563,8 @@ if predict_btn:
             file_name=pdf_filename,
             mime="application/pdf"
         )
-# ---------- PART 4: Footer, spacing & end-of-page ----------
 
+# ---------- PART 4: Footer, spacing & end-of-page ----------
 st.markdown("---")
 st.caption(
     """
